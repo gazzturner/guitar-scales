@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
 <title>Fretboard — Scale Explorer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
@@ -500,6 +500,77 @@
     #main { padding: 70px 12px 20px; }
     #status .status-key { font-size: 22px; }
   }
+
+  /* ── ROTATE PROMPT ──────────────────────────── */
+  #rotate-prompt {
+    display: none;
+    position: fixed; inset: 0;
+    z-index: 200;
+    background: var(--bg);
+    flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 20px;
+    text-align: center;
+    padding: 40px;
+  }
+  #rotate-prompt.show { display: flex; }
+  .rotate-icon {
+    font-size: 48px;
+    animation: rock 1.8s ease-in-out infinite;
+    display: block;
+  }
+  @keyframes rock {
+    0%, 100% { transform: rotate(-20deg); }
+    50%       { transform: rotate(20deg); }
+  }
+  .rotate-title {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 22px;
+    color: var(--amber);
+  }
+  .rotate-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    max-width: 240px;
+    line-height: 1.8;
+  }
+
+  /* ── MOBILE LANDSCAPE ────────────────────────── */
+  @media (max-height: 500px) and (orientation: landscape) {
+    #main {
+      padding: 56px 12px 8px;
+      align-items: flex-start;
+    }
+    #neck-wrap { min-width: 0; }
+    #neck { min-width: 0; }
+    .string-row { height: 36px; }
+    .open-cell  { height: 36px; }
+    .note-dot   { width: 24px; height: 24px; font-size: 8px; }
+    .string-label { font-size: 9px; width: 36px; }
+    .fret-nums { padding-left: 36px; }
+    .open-col  { width: 32px; }
+    .open-col-header { height: 24px; font-size: 9px; }
+    #status { top: 10px; }
+    .status-key { font-size: 18px; }
+    .status-scale { font-size: 9px; }
+    .status-box   { font-size: 8px; }
+    #menu-btn, #theme-btn { width: 34px; height: 34px; top: 10px; }
+    #menu-btn { left: 12px; }
+    #theme-btn { right: 12px; }
+    #legend { bottom: 8px; right: 12px; gap: 4px; }
+    .legend-item { font-size: 8px; }
+    .legend-dot { width: 10px; height: 10px; }
+    .inlay-dot { width: 6px; height: 6px; }
+  }
+
+  /* portrait mobile — hide everything except rotate prompt */
+  @media (max-width: 600px) and (orientation: portrait) {
+    #main, #menu-btn, #theme-btn, #status, #legend { display: none !important; }
+    #rotate-prompt { display: flex; }
+  }
+
 </style>
 </head>
 <body>
@@ -1094,5 +1165,13 @@ buildNeck(1, 15);
 buildPanel();
 render();
 </script>
+
+<!-- rotate prompt (portrait mobile only) -->
+<div id="rotate-prompt">
+  <span class="rotate-icon">🎸</span>
+  <div class="rotate-title">Rotate your device</div>
+  <div class="rotate-sub">The fretboard is best viewed in landscape mode</div>
+</div>
+
 </body>
 </html>
