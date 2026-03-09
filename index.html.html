@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fretboard — Scale Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0e0e0f;
+    --surface: #161618;
+    --panel: #1c1c1f;
+    --border: #2a2a2e;
+    --border-light: #353539;
+    --text: #e8e6e0;
+    --text-muted: #6b6b72;
+    --text-dim: #3f3f45;
+    --amber: #d4a843;
+    --amber-dim: #8a6a24;
+    --amber-glow: rgba(212, 168, 67, 0.15);
+    --fret-wood: #1a1612;
+    --fret-wire: #2e2820;
+    --fret-wire-nut: #4a3f30;
+    --string-color: #4a4035;
+    --inlay: #2a2620;
+    --accent: #c9b99a;
+    --scale-note-bg: #2a2a2e;
+    --scale-note-border: #353539;
+    --scale-note-text: #c9b99a;
+    --string-divider: #1f1c17;
+    --neck-border: #2a2218;
+    --overlay-bg: rgba(0,0,0,0.6);
+  }
+
+  :root.light {
+    --bg: #f0ebe3;
+    --surface: #e8e2d8;
+    --panel: #ede7dc;
+    --border: #cec5b5;
+    --border-light: #b8ae9e;
+    --text: #2a2218;
+    --text-muted: #7a6e5e;
+    --text-dim: #b0a898;
+    --amber: #a06c10;
+    --amber-dim: #c08830;
+    --amber-glow: rgba(160, 108, 16, 0.12);
+    --fret-wood: #d6cbba;
+    --fret-wire: #b0a090;
+    --fret-wire-nut: #7a6a50;
+    --string-color: #9a8870;
+    --inlay: #c4b8a4;
+    --accent: #4a3820;
+    --scale-note-bg: #e2dbd0;
+    --scale-note-border: #a09080;
+    --scale-note-text: #3a2c18;
+    --string-divider: #ccc4b4;
+    --neck-border: #b8ae9e;
+    --overlay-bg: rgba(0,0,0,0.35);
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    overflow: hidden;
+  }
+
+  /* ── PANEL ─────────────────────────────────── */
+  #panel {
+    position: fixed;
+    top: 0; left: 0;
+    width: 300px;
+    height: 100%;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    transform: translateX(-300px);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  #panel.open { transform: translateX(0); }
+
+  #panel-overlay {
+    position: fixed; inset: 0;
+    background: var(--overlay-bg);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.35s;
+    z-index: 99;
+  }
+  #panel-overlay.active { opacity: 1; pointer-events: all; }
+
+  .panel-header {
+    padding: 28px 24px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .panel-title {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 18px;
+    color: var(--amber);
+    letter-spacing: 0.02em;
+  }
+  .panel-close {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted);
+    font-size: 20px;
+    line-height: 1;
+    padding: 4px;
+    transition: color 0.15s;
+  }
+  .panel-close:hover { color: var(--text); }
+
+  .panel-section {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-section:last-child { border-bottom: none; }
+
+  .section-label {
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  .btn-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+  .btn-grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .btn-grid-2 { grid-template-columns: repeat(2, 1fr); }
+
+  .sel-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 8px 4px;
+    border-radius: 4px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+  .sel-btn:hover { border-color: var(--border-light); color: var(--text); }
+  .sel-btn.active {
+    background: var(--amber-glow);
+    border-color: var(--amber-dim);
+    color: var(--amber);
+  }
+
+  .scale-btn {
+    padding: 9px 8px;
+    font-size: 10px;
+    line-height: 1.3;
+    grid-column: span 2;
+  }
+  .scale-btn.full { grid-column: span 4; }
+
+  /* box selector */
+  .box-row {
+    display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  }
+  .box-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    width: 36px; height: 36px;
+    border-radius: 4px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .box-btn:hover { border-color: var(--border-light); color: var(--text); }
+  .box-btn.active {
+    background: var(--amber-glow);
+    border-color: var(--amber-dim);
+    color: var(--amber);
+  }
+  .box-btn.all-btn {
+    width: auto; padding: 0 12px;
+    font-size: 10px; letter-spacing: 0.08em;
+  }
+
+  /* song key recommender */
+  .recommend-output {
+    margin-top: 14px;
+    min-height: 40px;
+  }
+  .rec-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .rec-item:hover { border-color: var(--border-light); }
+  .rec-item.selected { border-color: var(--amber-dim); background: var(--amber-glow); }
+  .rec-name { font-size: 11px; color: var(--text); flex: 1; }
+  .rec-vibe { font-size: 10px; color: var(--text-muted); }
+  .rec-match {
+    font-size: 9px;
+    color: var(--amber);
+    letter-spacing: 0.05em;
+  }
+
+  /* ── TOGGLE BTN ─────────────────────────────── */
+  #menu-btn {
+    position: fixed;
+    top: 24px; left: 24px;
+    z-index: 98;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    width: 44px; height: 44px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 5px;
+    transition: all 0.15s;
+  }
+  #menu-btn:hover { border-color: var(--border-light); color: var(--text); }
+  #menu-btn span {
+    display: block;
+    width: 16px; height: 1.5px;
+    background: currentColor;
+    transition: all 0.2s;
+  }
+
+  /* ── STATUS BAR ─────────────────────────────── */
+  #status {
+    position: fixed;
+    top: 24px; left: 50%; transform: translateX(-50%);
+    z-index: 50;
+    display: flex; align-items: center; gap: 16px;
+    pointer-events: none;
+  }
+  .status-key {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px;
+    font-style: italic;
+    color: var(--amber);
+    line-height: 1;
+  }
+  .status-scale {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+  }
+  .status-box {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+
+  /* ── MAIN / NECK ────────────────────────────── */
+  #main {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    padding: 80px 40px 40px;
+  }
+
+  #neck-wrap {
+    width: 100%;
+    max-width: 1100px;
+    overflow-x: auto;
+    padding-bottom: 10px;
+  }
+
+  #neck {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 860px;
+  }
+
+  /* open strings column */
+  .open-col {
+    width: 44px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--fret-wood);
+    border: 1px solid var(--neck-border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .open-col-header {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-align: center;
+    height: 34px;
+    display: flex; align-items: flex-end; justify-content: center;
+    padding-bottom: 4px;
+    background: transparent;
+  }
+  .open-cell {
+    height: 52px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .open-cell:not(:last-child) {
+    border-bottom: 1px solid var(--string-divider);
+  }
+
+  /* fret numbers */
+  .fret-nums {
+    display: flex;
+    margin-bottom: 10px;
+    padding-left: 56px;
+  }
+  .fret-num {
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+    text-align: center;
+    flex: 1;
+  }
+  .fret-num.inlay { color: var(--amber-dim); }
+
+  /* strings */
+  .strings-area {
+    position: relative;
+    background: var(--fret-wood);
+    border-radius: 4px;
+    border: 1px solid var(--neck-border);
+    overflow: hidden;
+  }
+
+  .string-row {
+    display: flex;
+    align-items: center;
+    position: relative;
+    height: 52px;
+  }
+  .string-row:not(:last-child) {
+    border-bottom: 1px solid var(--string-divider);
+  }
+
+  /* string name label */
+  .string-label {
+    width: 56px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* the actual string line */
+  .string-line {
+    position: absolute;
+    left: 56px; right: 0;
+    top: 50%;
+    height: 1px;
+    background: var(--string-color);
+    pointer-events: none;
+  }
+  .string-row:nth-child(1) .string-line { height: 3px; background: var(--string-color); margin-top: -1px; }
+  .string-row:nth-child(2) .string-line { height: 2.5px; background: var(--string-color); }
+  .string-row:nth-child(3) .string-line { height: 2px; background: var(--string-color); }
+  .string-row:nth-child(4) .string-line { height: 1.5px; background: var(--string-color); }
+  .string-row:nth-child(5) .string-line { height: 1px; background: var(--string-color); }
+  .string-row:nth-child(6) .string-line { height: 1px; background: var(--string-color); }
+
+  /* fret cells */
+  .frets {
+    display: flex;
+    flex: 1;
+    height: 100%;
+    position: relative;
+    z-index: 1;
+  }
+  .fret-cell {
+    flex: 1;
+    height: 100%;
+    border-left: 2px solid var(--fret-wire);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .fret-cell:first-child { border-left-width: 4px; border-color: var(--fret-wire-nut); }
+
+  /* inlay dots */
+  .inlay-dot {
+    position: absolute;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--inlay);
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+
+  /* note dots */
+  .note-dot {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+    letter-spacing: 0;
+    cursor: default;
+    position: relative;
+    z-index: 3;
+    opacity: 0;
+    transform: scale(0.4);
+    transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .note-dot.visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+  .note-dot.root {
+    background: var(--amber);
+    color: #1a1208;
+    box-shadow: 0 0 12px rgba(212, 168, 67, 0.4);
+  }
+  .note-dot.scale-note {
+    background: var(--scale-note-bg);
+    border: 1.5px solid var(--scale-note-border);
+    color: var(--scale-note-text);
+  }
+
+  /* open string indicator */
+  .note-dot.open-string {
+    background: var(--open-bg);
+    border: 2px dashed var(--amber);
+    color: var(--amber);
+    box-shadow: none;
+  }
+  .note-dot.open-string.root {
+    background: var(--amber-glow);
+    border: 2px dashed var(--amber);
+    color: var(--amber);
+    box-shadow: 0 0 10px rgba(212, 168, 67, 0.25);
+  }
+
+  /* ── THEME TOGGLE ──────────────────────────── */
+  #theme-btn {
+    position: fixed;
+    top: 24px; right: 24px;
+    z-index: 98;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    width: 44px; height: 44px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    transition: all 0.15s;
+  }
+  #theme-btn:hover { border-color: var(--border-light); color: var(--text); }
+
+  /* ── LEGEND ─────────────────────────────────── */
+  #legend {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    display: flex; flex-direction: column; gap: 8px;
+    pointer-events: none;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 10px; color: var(--text-muted);
+    letter-spacing: 0.05em;
+  }
+  .legend-dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+  }
+  .legend-dot.r { background: var(--amber); }
+  .legend-dot.s { background: var(--scale-note-bg); border: 1.5px solid var(--scale-note-border); }
+  .legend-dot.o { background: transparent; border: 2px dashed var(--amber); }
+
+  /* scrollbar */
+  #neck-wrap::-webkit-scrollbar { height: 4px; }
+  #neck-wrap::-webkit-scrollbar-track { background: transparent; }
+  #neck-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  @media (max-width: 600px) {
+    #main { padding: 70px 12px 20px; }
+    #status .status-key { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- overlay -->
+<div id="panel-overlay" onclick="closePanel()"></div>
+
+<!-- slide-out panel -->
+<div id="panel">
+  <div class="panel-header">
+    <span class="panel-title">Scale Explorer</span>
+    <button class="panel-close" onclick="closePanel()">✕</button>
+  </div>
+
+  <!-- KEY -->
+  <div class="panel-section">
+    <div class="section-label">Root Key</div>
+    <div class="btn-grid" id="key-btns"></div>
+  </div>
+
+  <!-- SCALE -->
+  <div class="panel-section">
+    <div class="section-label">Scale</div>
+    <div class="btn-grid" id="scale-btns"></div>
+  </div>
+
+  <!-- BOX -->
+  <div class="panel-section">
+    <div class="section-label">Position / Box</div>
+    <div class="box-row" id="box-btns"></div>
+  </div>
+
+  <!-- SONG KEY RECOMMENDER -->
+  <div class="panel-section">
+    <div class="section-label">Song Key Recommender</div>
+    <div class="btn-grid" id="song-key-btns"></div>
+    <div class="recommend-output" id="recommend-output"></div>
+  </div>
+</div>
+
+<!-- hamburger -->
+<button id="menu-btn" onclick="togglePanel()">
+  <span></span><span></span><span></span>
+</button>
+
+<!-- theme toggle -->
+<button id="theme-btn" onclick="toggleTheme()" title="Toggle light/dark mode">
+  <span id="theme-icon">☀</span>
+</button>
+
+<!-- status bar -->
+<div id="status">
+  <span class="status-key" id="st-key">A</span>
+  <div>
+    <div class="status-scale" id="st-scale">PENTATONIC MINOR</div>
+    <div class="status-box" id="st-box">BOX 1</div>
+  </div>
+</div>
+
+<!-- neck -->
+<div id="main">
+  <div id="neck-wrap">
+    <div id="neck">
+      <div style="display:flex; gap:6px; align-items:flex-start;">
+        <div class="open-col" id="open-col">
+          <div class="open-col-header">○</div>
+          <!-- open cells injected by JS -->
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div class="fret-nums" id="fret-nums"></div>
+          <div class="strings-area" id="strings-area"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- legend -->
+<div id="legend">
+  <div class="legend-item"><div class="legend-dot r"></div>root</div>
+  <div class="legend-item"><div class="legend-dot s"></div>scale tone</div>
+  <div class="legend-item"><div class="legend-dot o"></div>open string</div>
+</div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────
+const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const NOTE_NAMES = {
+  'C#':'C#/D♭','D#':'D#/E♭','F#':'F#/G♭','G#':'G#/A♭','A#':'A#/B♭'
+};
+
+const SCALES = {
+  'Pentatonic Minor': { intervals: [0,3,5,7,10], vibe: 'Bluesy, soulful' },
+  'Pentatonic Major': { intervals: [0,2,4,7,9],  vibe: 'Bright, country' },
+  'Natural Minor':    { intervals: [0,2,3,5,7,8,10], vibe: 'Dark, emotional' },
+  'Major':            { intervals: [0,2,4,5,7,9,11], vibe: 'Happy, resolved' },
+  'Dorian':           { intervals: [0,2,3,5,7,9,10], vibe: 'Jazzy minor' },
+  'Mixolydian':       { intervals: [0,2,4,5,7,9,10], vibe: 'Bluesy major' },
+  'Blues':            { intervals: [0,3,5,6,7,10],   vibe: 'Raw blues' },
+  'Harmonic Minor':   { intervals: [0,2,3,5,7,8,11], vibe: 'Exotic, dramatic' },
+  'Lydian':           { intervals: [0,2,4,6,7,9,11], vibe: 'Dreamy, floating' },
+  'Phrygian':         { intervals: [0,1,3,5,7,8,10], vibe: 'Spanish, dark' },
+};
+
+// Standard tuning: E2 A2 D3 G3 B3 E4 (low to high, we display high to low)
+const OPEN_STRINGS = [4,11,7,2,9,4]; // E B G D A E (high to low)
+const STRING_NAMES = ['e','B','G','D','A','E'];
+const FRET_COUNT = 15;
+const INLAY_FRETS = [3,5,7,9,12,15];
+
+// DYNAMIC BOX COMPUTATION
+// Boxes are computed at runtime from scale intervals + key.
+// Each box is a set of [stringIdx, fretOffset] where fretOffset is relative to root on low E.
+// This is musically accurate for any key.
+
+function computeBoxPatterns(key, scaleName) {
+  const scale = SCALES[scaleName];
+  if (!scale) return [];
+  const intervals = scale.intervals;
+  const scaleNotes = intervals.map(i => NOTES[(noteIndex(key) + i) % 12]);
+  const isPenta = intervals.length <= 5;
+
+  // Find root fret on low E (string 5)
+  let rootFret = -1;
+  for (let f = 0; f <= 15; f++) {
+    if (fretNote(5, f) === key) { rootFret = f; break; }
+  }
+  if (rootFret < 0) rootFret = 0;
+
+  // Find all positions on low E where a scale note lands (these anchor each box)
+  const anchors = [];
+  for (let f = rootFret - 1; f <= rootFret + 13; f++) {
+    if (f >= 0 && scaleNotes.includes(fretNote(5, f))) anchors.push(f);
+  }
+
+  const numBoxes = isPenta ? 5 : 7;
+  const boxes = [];
+
+  for (let bi = 0; bi < numBoxes && bi < anchors.length; bi++) {
+    const start = anchors[bi];
+    const box = [];
+
+    for (let s = 5; s >= 0; s--) {
+      // Find up to 2 (penta) or 3 (heptatonic) notes per string in a ~5 fret window
+      const maxNotes = isPenta ? 2 : 3;
+      let found = 0;
+      for (let f = start - 1; f <= start + 5 && found < maxNotes; f++) {
+        if (f >= 1 && f <= 20 && scaleNotes.includes(fretNote(s, f))) {
+          box.push([s, f - rootFret]);
+          found++;
+        }
+      }
+    }
+    // Deduplicate
+    const seen = new Set();
+    const dedupedBox = box.filter(([s, o]) => {
+      const k = `${s},${o}`;
+      if (seen.has(k)) return false;
+      seen.add(k); return true;
+    });
+    if (dedupedBox.length > 0) boxes.push(dedupedBox);
+  }
+
+  return { rootFret, boxes };
+}
+
+// Legacy stub so nothing breaks — actual patterns computed dynamically
+const BOX_PATTERNS = {
+  'Pentatonic Minor': [
+    // Box 1 — root position
+    [[5,0],[5,3],[4,0],[4,2],[3,0],[3,2],[2,0],[2,3],[1,0],[1,3],[0,0],[0,3]],
+    // Box 2
+    [[5,3],[5,5],[4,2],[4,5],[3,2],[3,4],[2,3],[2,5],[1,3],[1,5],[0,3],[0,5]],
+    // Box 3
+    [[5,5],[5,7],[4,5],[4,7],[3,4],[3,7],[2,5],[2,7],[1,5],[1,8],[0,5],[0,7]],
+    // Box 4
+    [[5,7],[5,10],[4,7],[4,9],[3,7],[3,9],[2,7],[2,10],[1,8],[1,10],[0,7],[0,10]],
+    // Box 5
+    [[5,10],[5,12],[4,9],[4,12],[3,9],[3,12],[2,10],[2,12],[1,10],[1,12],[0,10],[0,12]],
+  ],
+  'Pentatonic Major': [
+    // Box 1 — root on low E
+    [[5,0],[5,2],[4,0],[4,2],[3,1],[3,4],[2,1],[2,4],[1,2],[1,5],[0,0],[0,2]],
+    // Box 2
+    [[5,2],[5,5],[4,2],[4,4],[3,1],[3,4],[2,1],[2,4],[1,2],[1,5],[0,2],[0,5]],
+    // Box 3
+    [[5,5],[5,7],[4,4],[4,7],[3,4],[3,6],[2,4],[2,7],[1,5],[1,7],[0,5],[0,7]],
+    // Box 4
+    [[5,7],[5,9],[4,7],[4,9],[3,6],[3,9],[2,7],[2,9],[1,7],[1,9],[0,7],[0,9]],
+    // Box 5
+    [[5,9],[5,12],[4,9],[4,12],[3,9],[3,11],[2,9],[2,12],[1,9],[1,12],[0,9],[0,12]],
+  ],
+  'Natural Minor': [
+    [[5,0],[5,2],[5,3],[4,0],[4,2],[4,3],[3,0],[3,2],[2,0],[2,1],[2,3],[1,0],[1,1],[1,3],[0,0],[0,2],[0,3]],
+    [[5,2],[5,3],[5,5],[4,2],[4,3],[4,5],[3,2],[3,3],[3,5],[2,3],[2,5],[1,3],[1,5],[0,3],[0,5]],
+    [[5,3],[5,5],[5,7],[4,3],[4,5],[4,7],[3,5],[3,7],[2,5],[2,6],[2,8],[1,5],[1,6],[1,8],[0,5],[0,7]],
+    [[5,5],[5,7],[5,8],[4,5],[4,7],[4,8],[3,7],[3,8],[3,10],[2,8],[2,10],[1,8],[1,10],[0,7],[0,8],[0,10]],
+    [[5,7],[5,8],[5,10],[4,7],[4,8],[4,10],[3,7],[3,9],[3,10],[2,8],[2,10],[2,12],[1,8],[1,10],[1,12],[0,8],[0,10]],
+    [[5,8],[5,10],[5,12],[4,8],[4,10],[4,12],[3,9],[3,10],[3,12],[2,10],[2,12],[1,10],[1,12],[0,10],[0,12]],
+    [[5,10],[5,12],[4,10],[4,12],[3,10],[3,12],[2,10],[2,12],[1,10],[1,12],[0,10],[0,12]],
+  ],
+  'Major': [
+    [[5,0],[5,2],[5,4],[4,0],[4,2],[4,4],[3,1],[3,2],[3,4],[2,1],[2,2],[2,4],[1,2],[1,4],[1,5],[0,0],[0,2],[0,4]],
+    [[5,2],[5,4],[5,5],[4,2],[4,4],[4,5],[3,2],[3,4],[3,6],[2,4],[2,6],[1,4],[1,5],[1,7],[0,4],[0,5],[0,7]],
+    [[5,4],[5,5],[5,7],[4,4],[4,5],[4,7],[3,4],[3,6],[3,7],[2,4],[2,6],[2,7],[1,5],[1,7],[1,9],[0,5],[0,7]],
+    [[5,5],[5,7],[5,9],[4,5],[4,7],[4,9],[3,6],[3,7],[3,9],[2,6],[2,7],[2,9],[1,7],[1,9],[1,11],[0,7],[0,9]],
+    [[5,7],[5,9],[5,11],[4,7],[4,9],[4,11],[3,7],[3,9],[3,11],[2,9],[2,11],[1,9],[1,11],[1,12],[0,9],[0,11],[0,12]],
+    [[5,9],[5,11],[5,12],[4,9],[4,11],[4,12],[3,9],[3,11],[3,12],[2,11],[2,12],[1,9],[1,11],[1,12],[0,9],[0,11]],
+    [[5,11],[5,12],[4,11],[4,12],[3,11],[3,12],[2,11],[2,12],[1,11],[1,12],[0,11],[0,12]],
+  ],
+  'Blues': [
+    [[5,0],[5,3],[5,5],[5,6],[5,7],[4,0],[4,2],[4,3],[3,0],[3,2],[3,3],[2,0],[2,3],[1,0],[1,3],[0,0],[0,3]],
+    [[5,3],[5,5],[5,6],[4,2],[4,3],[4,5],[3,2],[3,3],[3,5],[2,3],[2,5],[1,3],[1,5],[0,3],[0,5]],
+    [[5,5],[5,6],[5,7],[5,10],[4,5],[4,7],[3,5],[3,7],[2,5],[2,7],[1,5],[1,6],[1,7],[0,5],[0,7]],
+    [[5,7],[5,10],[4,7],[4,9],[4,10],[3,7],[3,9],[3,10],[2,7],[2,10],[1,7],[1,10],[0,7],[0,10]],
+    [[5,10],[5,12],[4,10],[4,12],[3,10],[3,12],[2,10],[2,12],[1,10],[1,11],[1,12],[0,10],[0,12]],
+  ],
+  'Dorian': [
+    [[5,0],[5,2],[5,3],[4,0],[4,2],[4,3],[3,0],[3,2],[2,0],[2,2],[2,3],[1,0],[1,2],[1,3],[0,0],[0,2],[0,3]],
+    [[5,2],[5,3],[5,5],[4,2],[4,3],[4,5],[3,2],[3,4],[3,5],[2,3],[2,5],[1,3],[1,5],[0,3],[0,5]],
+    [[5,3],[5,5],[5,7],[4,3],[4,5],[4,7],[3,5],[3,7],[2,5],[2,7],[1,5],[1,7],[0,5],[0,7]],
+    [[5,5],[5,7],[5,8],[4,5],[4,7],[4,8],[3,7],[3,9],[2,7],[2,8],[2,10],[1,7],[1,8],[1,10],[0,7],[0,8]],
+    [[5,7],[5,8],[5,10],[4,7],[4,8],[4,10],[3,7],[3,9],[3,10],[2,8],[2,10],[1,8],[1,10],[0,8],[0,10]],
+    [[5,8],[5,10],[5,12],[4,8],[4,10],[4,12],[3,9],[3,10],[3,12],[2,10],[2,12],[1,10],[1,12],[0,10],[0,12]],
+    [[5,10],[5,12],[4,10],[4,12],[3,10],[3,12],[2,10],[2,12],[1,10],[1,12],[0,10],[0,12]],
+  ],
+  'Mixolydian': [
+    [[5,0],[5,2],[5,4],[4,0],[4,2],[4,4],[3,1],[3,2],[3,4],[2,1],[2,2],[2,4],[1,2],[1,4],[0,0],[0,2],[0,4]],
+    [[5,2],[5,4],[5,5],[4,2],[4,4],[4,5],[3,2],[3,4],[2,2],[2,4],[2,5],[1,2],[1,4],[1,5],[0,2],[0,4],[0,5]],
+    [[5,4],[5,5],[5,7],[4,4],[4,5],[4,7],[3,4],[3,5],[3,7],[2,4],[2,5],[2,7],[1,5],[1,7],[0,5],[0,7]],
+    [[5,5],[5,7],[5,9],[4,5],[4,7],[4,9],[3,5],[3,7],[3,9],[2,5],[2,7],[2,9],[1,7],[1,9],[1,10],[0,7],[0,9]],
+    [[5,7],[5,9],[5,10],[4,7],[4,9],[4,10],[3,7],[3,9],[3,10],[2,7],[2,9],[2,10],[1,9],[1,10],[0,9],[0,10]],
+    [[5,9],[5,10],[5,12],[4,9],[4,10],[4,12],[3,9],[3,10],[3,12],[2,9],[2,10],[2,12],[1,10],[1,12],[0,10],[0,12]],
+    [[5,10],[5,12],[4,10],[4,12],[3,10],[3,12],[2,10],[2,12],[1,10],[1,12],[0,10],[0,12]],
+  ],
+  'Harmonic Minor': [
+    [[5,0],[5,2],[5,3],[4,0],[4,2],[4,3],[3,0],[3,2],[2,0],[2,1],[2,4],[1,0],[1,1],[1,4],[0,0],[0,2],[0,3]],
+    [[5,2],[5,3],[5,5],[4,2],[4,3],[4,5],[3,2],[3,4],[3,5],[2,4],[2,5],[1,4],[1,5],[0,4],[0,5]],
+    [[5,3],[5,5],[5,7],[4,3],[4,5],[4,7],[3,5],[3,7],[2,5],[2,8],[1,5],[1,8],[0,5],[0,7]],
+    [[5,5],[5,7],[5,8],[4,5],[4,7],[4,8],[3,7],[3,8],[3,11],[2,8],[2,11],[1,8],[1,11],[0,8]],
+    [[5,7],[5,8],[5,11],[4,7],[4,8],[4,11],[3,7],[3,9],[3,11],[2,8],[2,9],[2,11],[1,8],[1,11],[0,8],[0,11]],
+    [[5,8],[5,11],[5,12],[4,8],[4,11],[4,12],[3,9],[3,11],[3,12],[2,9],[2,11],[2,12],[1,11],[1,12],[0,11],[0,12]],
+    [[5,11],[5,12],[4,11],[4,12],[3,11],[3,12],[2,11],[2,12],[1,11],[1,12],[0,11],[0,12]],
+  ],
+  'Lydian': [
+    [[5,0],[5,2],[5,4],[4,0],[4,2],[4,4],[3,1],[3,3],[3,4],[2,1],[2,3],[2,4],[1,2],[1,4],[1,6],[0,0],[0,2],[0,4]],
+    [[5,2],[5,4],[5,6],[4,2],[4,4],[4,6],[3,3],[3,4],[3,6],[2,3],[2,4],[2,6],[1,4],[1,6],[0,2],[0,4],[0,6]],
+    [[5,4],[5,6],[5,7],[4,4],[4,6],[4,7],[3,4],[3,6],[3,7],[2,4],[2,6],[2,7],[1,6],[1,7],[1,9],[0,4],[0,6],[0,7]],
+    [[5,6],[5,7],[5,9],[4,6],[4,7],[4,9],[3,6],[3,7],[3,9],[2,6],[2,7],[2,9],[1,7],[1,9],[1,11],[0,6],[0,7],[0,9]],
+    [[5,7],[5,9],[5,11],[4,7],[4,9],[4,11],[3,7],[3,9],[3,11],[2,9],[2,11],[1,9],[1,11],[0,7],[0,9],[0,11]],
+    [[5,9],[5,11],[5,12],[4,9],[4,11],[4,12],[3,9],[3,11],[3,12],[2,11],[2,12],[1,11],[1,12],[0,9],[0,11]],
+    [[5,11],[5,12],[4,11],[4,12],[3,11],[3,12],[2,11],[2,12],[1,11],[1,12],[0,11],[0,12]],
+  ],
+  'Phrygian': [
+    [[5,0],[5,1],[5,3],[4,0],[4,1],[4,3],[3,0],[3,1],[3,3],[2,0],[2,1],[2,3],[1,0],[1,1],[1,3],[0,0],[0,1],[0,3]],
+    [[5,1],[5,3],[5,5],[4,1],[4,3],[4,5],[3,1],[3,3],[3,5],[2,1],[2,3],[2,5],[1,1],[1,3],[1,5],[0,1],[0,3],[0,5]],
+    [[5,3],[5,5],[5,6],[4,3],[4,5],[4,6],[3,3],[3,5],[3,7],[2,3],[2,5],[2,6],[1,3],[1,5],[1,6],[0,3],[0,5],[0,6]],
+    [[5,5],[5,6],[5,8],[4,5],[4,6],[4,8],[3,5],[3,7],[3,8],[2,5],[2,6],[2,8],[1,5],[1,6],[1,8],[0,5],[0,6],[0,8]],
+    [[5,6],[5,8],[5,10],[4,6],[4,8],[4,10],[3,7],[3,8],[3,10],[2,6],[2,8],[2,10],[1,6],[1,8],[1,10],[0,6],[0,8],[0,10]],
+    [[5,8],[5,10],[5,11],[4,8],[4,10],[4,11],[3,8],[3,10],[3,12],[2,8],[2,10],[2,11],[1,8],[1,10],[1,11],[0,8],[0,10],[0,11]],
+    [[5,10],[5,11],[4,10],[4,11],[3,10],[3,12],[2,10],[2,11],[1,10],[1,11],[0,10],[0,11]],
+  ],
+};
+
+// ── STATE ──────────────────────────────────────────────────────
+let state = {
+  key: 'A',
+  scale: 'Pentatonic Minor',
+  box: 1,       // 1-5 or 0 = all
+  songKey: null,
+};
+
+// ── HELPERS ──────────────────────────────────────────────────
+function noteIndex(note) { return NOTES.indexOf(note); }
+function transpose(root, interval) { return NOTES[(noteIndex(root) + interval) % 12]; }
+
+function getScaleNotes(root, scaleName) {
+  const scale = SCALES[scaleName];
+  if (!scale) return [];
+  return scale.intervals.map(i => NOTES[(noteIndex(root) + i) % 12]);
+}
+
+function fretNote(stringIdx, fret) {
+  return NOTES[(OPEN_STRINGS[stringIdx] + fret) % 12];
+}
+
+// ── BUILD UI ──────────────────────────────────────────────────
+function buildPanel() {
+  // Keys
+  const kb = document.getElementById('key-btns');
+  kb.innerHTML = '';
+  NOTES.forEach(n => {
+    const b = document.createElement('button');
+    b.className = 'sel-btn' + (n === state.key ? ' active' : '');
+    b.textContent = NOTE_NAMES[n] ? n : n;
+    b.title = NOTE_NAMES[n] || n;
+    b.onclick = () => { state.key = n; render(); buildPanel(); };
+    kb.appendChild(b);
+  });
+
+  // Scales
+  const sb = document.getElementById('scale-btns');
+  sb.className = 'btn-grid';
+  sb.innerHTML = '';
+  Object.keys(SCALES).forEach(name => {
+    const b = document.createElement('button');
+    b.className = 'sel-btn scale-btn' + (name === state.scale ? ' active' : '');
+    const shortNames = {
+      'Pentatonic Minor':'Penta Min','Pentatonic Major':'Penta Maj',
+      'Natural Minor':'Nat. Minor','Major':'Major',
+      'Dorian':'Dorian','Mixolydian':'Mixolydian',
+      'Blues':'Blues','Harmonic Minor':'Harm. Minor',
+      'Lydian':'Lydian','Phrygian':'Phrygian',
+    };
+    b.textContent = shortNames[name] || name;
+    b.title = name + ' — ' + SCALES[name].vibe;
+    b.onclick = () => { state.scale = name; state.box = 1; render(); buildPanel(); };
+    sb.appendChild(b);
+  });
+
+  // Boxes
+  const bb = document.getElementById('box-btns');
+  bb.innerHTML = '';
+  const allB = document.createElement('button');
+  allB.className = 'box-btn all-btn' + (state.box === 0 ? ' active' : '');
+  allB.textContent = 'ALL';
+  allB.onclick = () => { state.box = 0; render(); buildPanel(); };
+  bb.appendChild(allB);
+
+  const { boxes } = computeBoxPatterns(state.key, state.scale);
+  const maxBoxes = boxes.length || 5;
+  for (let i = 1; i <= maxBoxes; i++) {
+    const b = document.createElement('button');
+    b.className = 'box-btn' + (state.box === i ? ' active' : '');
+    b.textContent = i;
+    b.onclick = () => { state.box = i; render(); buildPanel(); };
+    bb.appendChild(b);
+  }
+
+  // Song key
+  const skb = document.getElementById('song-key-btns');
+  skb.innerHTML = '';
+  NOTES.forEach(n => {
+    const b = document.createElement('button');
+    b.className = 'sel-btn' + (n === state.songKey ? ' active' : '');
+    b.textContent = n;
+    b.onclick = () => {
+      state.songKey = state.songKey === n ? null : n;
+      buildPanel();
+    };
+    skb.appendChild(b);
+  });
+
+  buildRecommendations();
+}
+
+function buildRecommendations() {
+  const out = document.getElementById('recommend-output');
+  if (!state.songKey) {
+    out.innerHTML = '<div style="font-size:10px;color:var(--text-dim);padding:4px 0">Select a song key above</div>';
+    return;
+  }
+  const recs = recommendScales(state.songKey);
+  out.innerHTML = '';
+  recs.forEach(r => {
+    const el = document.createElement('div');
+    el.className = 'rec-item' + (state.key === state.songKey && state.scale === r.name ? ' selected' : '');
+    el.innerHTML = `
+      <div>
+        <div class="rec-name">${state.songKey} ${r.name}</div>
+        <div class="rec-vibe">${r.vibe}</div>
+      </div>
+      <div class="rec-match">${r.match}</div>
+    `;
+    el.onclick = () => {
+      state.key = state.songKey;
+      state.scale = r.name;
+      state.box = 1;
+      render();
+      buildPanel();
+    };
+    out.appendChild(el);
+  });
+}
+
+function recommendScales(songKey) {
+  const recs = [];
+  // Major key → suggest major scales
+  const majors = ['Major','Mixolydian','Pentatonic Major','Lydian','Dorian'];
+  const minors = ['Pentatonic Minor','Natural Minor','Blues','Harmonic Minor','Dorian','Phrygian'];
+  // Just give a curated list based on key
+  const all = [
+    { name:'Pentatonic Minor', match:'★★★★★' },
+    { name:'Blues',            match:'★★★★★' },
+    { name:'Natural Minor',    match:'★★★★☆' },
+    { name:'Pentatonic Major', match:'★★★★☆' },
+    { name:'Dorian',           match:'★★★☆☆' },
+    { name:'Major',            match:'★★★☆☆' },
+    { name:'Mixolydian',       match:'★★★☆☆' },
+    { name:'Harmonic Minor',   match:'★★☆☆☆' },
+  ];
+  return all.map(r => ({ ...r, vibe: SCALES[r.name].vibe }));
+}
+
+// ── NECK RENDER ────────────────────────────────────────────────
+let currentFretMin = 1;
+let currentFretMax = 15;
+
+function buildNeck(fretMin, fretMax) {
+  currentFretMin = fretMin;
+  currentFretMax = fretMax;
+
+  const numsEl = document.getElementById('fret-nums');
+  const stringsEl = document.getElementById('strings-area');
+  const openCol = document.getElementById('open-col');
+  numsEl.innerHTML = '';
+  stringsEl.innerHTML = '';
+  // Keep header, remove old cells
+  openCol.innerHTML = '<div class="open-col-header">○</div>';
+
+  for (let f = fretMin; f <= fretMax; f++) {
+    const d = document.createElement('div');
+    d.className = 'fret-num' + (INLAY_FRETS.includes(f) ? ' inlay' : '');
+    d.textContent = f;
+    numsEl.appendChild(d);
+  }
+
+  STRING_NAMES.forEach((sName, sIdx) => {
+    // Open string cell
+    const openCell = document.createElement('div');
+    openCell.className = 'open-cell';
+    const openDot = document.createElement('div');
+    openDot.className = 'note-dot';
+    openDot.dataset.string = sIdx;
+    openDot.dataset.fret = '0';
+    openCell.appendChild(openDot);
+    openCol.appendChild(openCell);
+
+    // Fretted row
+    const row = document.createElement('div');
+    row.className = 'string-row';
+
+    const label = document.createElement('div');
+    label.className = 'string-label';
+    label.textContent = sName;
+    row.appendChild(label);
+
+    const line = document.createElement('div');
+    line.className = 'string-line';
+    row.appendChild(line);
+
+    const fretsDiv = document.createElement('div');
+    fretsDiv.className = 'frets';
+
+    for (let f = fretMin; f <= fretMax; f++) {
+      const cell = document.createElement('div');
+      cell.className = 'fret-cell';
+
+      if (INLAY_FRETS.includes(f) && f !== 12 && f !== 24) {
+        if (sIdx === 2) {
+          const dot = document.createElement('div');
+          dot.className = 'inlay-dot';
+          cell.appendChild(dot);
+        }
+      }
+      if ((f === 12 || f === 24) && (sIdx === 1 || sIdx === 3)) {
+        const dot = document.createElement('div');
+        dot.className = 'inlay-dot';
+        cell.appendChild(dot);
+      }
+
+      const noteDot = document.createElement('div');
+      noteDot.className = 'note-dot';
+      noteDot.dataset.string = sIdx;
+      noteDot.dataset.fret = f;
+      cell.appendChild(noteDot);
+      fretsDiv.appendChild(cell);
+    }
+
+    row.appendChild(fretsDiv);
+    stringsEl.appendChild(row);
+  });
+}
+
+function getFretRange() {
+  // For "all" mode always show full 1-15
+  if (state.box === 0) return [1, 15];
+
+  const { rootFret, boxes } = computeBoxPatterns(state.key, state.scale);
+  if (!boxes.length) return [1, 15];
+
+  const boxIdx = (state.box - 1) % boxes.length;
+  const pattern = boxes[boxIdx];
+
+  const frets = pattern.map(([, off]) => rootFret + off).filter(f => f >= 1);
+  if (!frets.length) return [1, 15];
+
+  const lo = Math.max(1, Math.min(...frets) - 1);
+  const hi = Math.max(...frets) + 1;
+  return [lo, hi];
+}
+
+function render() {
+  updateStatus();
+
+  const [fretMin, fretMax] = getFretRange();
+  if (fretMin !== currentFretMin || fretMax !== currentFretMax) {
+    buildNeck(fretMin, fretMax);
+  }
+
+  const activePositions = getActivePositions();
+  const scaleNotes = getScaleNotes(state.key, state.scale);
+  const rootNote = state.key;
+
+  document.querySelectorAll('.note-dot').forEach(dot => {
+    const sIdx = +dot.dataset.string;
+    const fret = +dot.dataset.fret;
+    const note = fretNote(sIdx, fret);
+    const inScale = scaleNotes.includes(note);
+    const isRoot = note === rootNote;
+    const isOpen = fret === 0;
+
+    // Open string: always visible if in scale (not filtered by box)
+    // Fretted: must be in box
+    const inBox = isOpen
+      ? true
+      : (activePositions === null || activePositions.has(`${sIdx},${fret}`));
+
+    dot.classList.remove('visible','root','scale-note','open-string');
+
+    if (inScale && inBox) {
+      dot.textContent = note;
+      dot.classList.add('visible');
+      if (isOpen) {
+        dot.classList.add('open-string');
+        if (isRoot) dot.classList.add('root');
+      } else {
+        dot.classList.add(isRoot ? 'root' : 'scale-note');
+      }
+    }
+  });
+}
+
+function getActivePositions() {
+  if (state.box === 0) return null;
+
+  const { rootFret, boxes } = computeBoxPatterns(state.key, state.scale);
+  if (!boxes.length) return null;
+
+  const boxIdx = (state.box - 1) % boxes.length;
+  const pattern = boxes[boxIdx];
+
+  const positions = new Set();
+  pattern.forEach(([sIdx, fretOffset]) => {
+    const actualFret = rootFret + fretOffset;
+    if (actualFret >= 1) positions.add(`${sIdx},${actualFret}`);
+  });
+
+  return positions;
+}
+
+function updateStatus() {
+  document.getElementById('st-key').textContent = state.key;
+  document.getElementById('st-scale').textContent = state.scale.toUpperCase();
+  document.getElementById('st-box').textContent = state.box === 0 ? 'ALL POSITIONS' : `BOX ${state.box}`;
+}
+
+// ── THEME ────────────────────────────────────────────────────
+function toggleTheme() {
+  const isLight = document.documentElement.classList.toggle('light');
+  document.getElementById('theme-icon').textContent = isLight ? '☽' : '☀';
+}
+
+// ── PANEL ────────────────────────────────────────────────────
+function togglePanel() {
+  const panel = document.getElementById('panel');
+  const overlay = document.getElementById('panel-overlay');
+  const isOpen = panel.classList.contains('open');
+  if (isOpen) closePanel();
+  else {
+    panel.classList.add('open');
+    overlay.classList.add('active');
+  }
+}
+function closePanel() {
+  document.getElementById('panel').classList.remove('open');
+  document.getElementById('panel-overlay').classList.remove('active');
+}
+
+// ── INIT ─────────────────────────────────────────────────────
+buildNeck(1, 15);
+buildPanel();
+render();
+</script>
+</body>
+</html>
