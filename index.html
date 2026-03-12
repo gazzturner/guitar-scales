@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
@@ -571,6 +571,59 @@
     #rotate-prompt { display: flex; }
   }
 
+
+  /* ── BLUES TOGGLE ───────────────────────────── */
+  .blues-toggle {
+    width: 100%;
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 12px;
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    transition: all 0.15s;
+    text-align: left;
+  }
+  .blues-toggle:hover { border-color: var(--border-light); color: var(--text); }
+  .blues-toggle.active {
+    background: var(--amber-glow);
+    border-color: var(--amber-dim);
+    color: var(--amber);
+  }
+  .blues-toggle-pip {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--border-light);
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .blues-toggle.active .blues-toggle-pip { background: var(--amber); }
+  .blues-hint {
+    margin-top: 8px;
+    font-size: 10px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    min-height: 0;
+  }
+
+  /* blues note dot style */
+  .note-dot.blues-note {
+    background: transparent;
+    border: 1.5px solid #c0392b;
+    color: #c0392b;
+  }
+  :root.light .note-dot.blues-note {
+    border-color: #c0392b;
+    color: #c0392b;
+  }
+  .legend-dot.b {
+    background: transparent;
+    border: 1.5px solid #c0392b;
+  }
+
 </style>
 </head>
 <body>
@@ -603,6 +656,16 @@
     <div class="box-row" id="box-btns"></div>
   </div>
 
+  <!-- BLUES NOTES TOGGLE -->
+  <div class="panel-section">
+    <div class="section-label">Blues Notes</div>
+    <button class="blues-toggle" id="blues-toggle-btn" onclick="toggleBluesNotes()">
+      <span class="blues-toggle-pip" id="blues-pip"></span>
+      <span id="blues-label">Show blues passing tones</span>
+    </button>
+    <div class="blues-hint" id="blues-hint"></div>
+  </div>
+
   <!-- SONG KEY RECOMMENDER -->
   <div class="panel-section">
     <div class="section-label">Song Key Recommender</div>
@@ -618,7 +681,7 @@
 
 <!-- theme toggle -->
 <button id="theme-btn" onclick="toggleTheme()" title="Toggle light/dark mode">
-  <span id="theme-icon">☀</span>
+  <span id="theme-icon">☽</span>
 </button>
 
 <!-- status bar -->
@@ -653,6 +716,7 @@
   <div class="legend-item"><div class="legend-dot r"></div>root</div>
   <div class="legend-item"><div class="legend-dot s"></div>scale tone</div>
   <div class="legend-item"><div class="legend-dot o"></div>open string</div>
+  <div class="legend-item blues-legend" id="blues-legend" style="display:none"><div class="legend-dot b"></div>blues tone</div>
 </div>
 
 <script>
@@ -717,8 +781,8 @@ function computeBoxPatterns(key, scaleName) {
       // Find up to 2 (penta) or 3 (heptatonic) notes per string in a ~5 fret window
       const maxNotes = isPenta ? 2 : 3;
       let found = 0;
-      for (let f = start - 1; f <= start + 5 && found < maxNotes; f++) {
-        if (f >= 1 && f <= 20 && scaleNotes.includes(fretNote(s, f))) {
+      for (let f = start - 1; f <= start + 4 && found < maxNotes; f++) {
+        if (f >= 0 && f <= 20 && scaleNotes.includes(fretNote(s, f))) {
           box.push([s, f - rootFret]);
           found++;
         }
@@ -841,7 +905,20 @@ let state = {
   scale: 'Pentatonic Minor',
   box: 1,       // 1-5 or 0 = all
   songKey: null,
+  bluesNotes: false,
 };
+
+// Blues note = b5 (tritone) relative to root — the "blue note"
+// For minor pentatonic: adds the b5 between the 4th and 5th
+// For other scales: adds b5 if not already present, and b3 if not present
+function getBluesNotes(root) {
+  // The classic passing tones: b3, b5, b7 relative to root
+  // b5 = tritone = interval 6
+  // b3 = interval 3 (already in minor scales, passing in major)  
+  // b7 = interval 10 (already in minor, passing in major)
+  const blueIntervals = [3, 6, 10]; // b3, b5 (tritone), b7
+  return blueIntervals.map(i => NOTES[(noteIndex(root) + i) % 12]);
+}
 
 // ── HELPERS ──────────────────────────────────────────────────
 function noteIndex(note) { return NOTES.indexOf(note); }
@@ -1083,6 +1160,7 @@ function render() {
 
   const activePositions = getActivePositions();
   const scaleNotes = getScaleNotes(state.key, state.scale);
+  const bluesNotesList = state.bluesNotes ? getBluesNotes(state.key) : [];
   const rootNote = state.key;
 
   document.querySelectorAll('.note-dot').forEach(dot => {
@@ -1090,16 +1168,19 @@ function render() {
     const fret = +dot.dataset.fret;
     const note = fretNote(sIdx, fret);
     const inScale = scaleNotes.includes(note);
+    const isBlues = !inScale && bluesNotesList.includes(note);
     const isRoot = note === rootNote;
     const isOpen = fret === 0;
 
-    // Open string: always visible if in scale (not filtered by box)
-    // Fretted: must be in box
     const inBox = isOpen
       ? true
       : (activePositions === null || activePositions.has(`${sIdx},${fret}`));
 
-    dot.classList.remove('visible','root','scale-note','open-string');
+    // Blues notes: show alongside box but not filtered strictly — 
+    // show them if they fall within the current fret range
+    const bluesInRange = isBlues && fret >= currentFretMin && fret <= currentFretMax;
+
+    dot.classList.remove('visible','root','scale-note','open-string','blues-note');
 
     if (inScale && inBox) {
       dot.textContent = note;
@@ -1110,6 +1191,9 @@ function render() {
       } else {
         dot.classList.add(isRoot ? 'root' : 'scale-note');
       }
+    } else if (bluesInRange) {
+      dot.textContent = note;
+      dot.classList.add('visible', 'blues-note');
     }
   });
 }
@@ -1136,6 +1220,28 @@ function updateStatus() {
   document.getElementById('st-key').textContent = state.key;
   document.getElementById('st-scale').textContent = state.scale.toUpperCase();
   document.getElementById('st-box').textContent = state.box === 0 ? 'ALL POSITIONS' : `BOX ${state.box}`;
+}
+
+// ── BLUES TOGGLE ─────────────────────────────────────────────
+function toggleBluesNotes() {
+  state.bluesNotes = !state.bluesNotes;
+  const btn = document.getElementById('blues-toggle-btn');
+  const label = document.getElementById('blues-label');
+  const hint = document.getElementById('blues-hint');
+  const legend = document.getElementById('blues-legend');
+  btn.classList.toggle('active', state.bluesNotes);
+  label.textContent = state.bluesNotes ? 'Blues passing tones on' : 'Show blues passing tones';
+  if (state.bluesNotes) {
+    const bNotes = getBluesNotes(state.key);
+    const scaleNotes = getScaleNotes(state.key, state.scale);
+    const passing = bNotes.filter(n => !scaleNotes.includes(n));
+    hint.textContent = passing.length ? 'Passing tones: ' + passing.join('  ') : 'All blues tones already in this scale';
+    legend.style.display = 'flex';
+  } else {
+    hint.textContent = '';
+    legend.style.display = 'none';
+  }
+  render();
 }
 
 // ── THEME ────────────────────────────────────────────────────
